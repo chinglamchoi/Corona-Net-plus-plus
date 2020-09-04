@@ -58,10 +58,10 @@ if __name__ == "__main__":
     #{1: default 5 encoder unet.py, 4: 4 encoders unet_4.py}
     args = parser.parse_args()
 
-    test_imgs, test_masks = np.load("data/mosmed_test_imgs.npy"), np.load("data/mosmed_test_masks.npy")
+    test_imgs, test_masks = np.load("new_data/test_imgs.npy"), np.load("new_data/test_msks.npy")
     testset = Covid(imgs=test_imgs, masks=test_masks)
 
-    testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=12)
+    testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=16)
 
     a = "cuda:" + str(args.cuda)
     device = torch.device(a if torch.cuda.is_available() else "cpu")
@@ -81,15 +81,17 @@ if __name__ == "__main__":
         for img, mask in testloader:
             mask_type = torch.float32
             img, mask = (img.to(device), mask.to(device, dtype=mask_type))
-            mask_pred = net(img)
-            t = [torch.sigmoid(i) for i in mask_pred]
-            tot_val += sum([DiceLoss(i, mask).item() for i in t])
-            tot_rand += sum([RandLoss(i, mask) for i in t])
+            mask_pred = net(img)[3]
+            t = torch.sigmoid(mask_pred)
+            tot_val += DiceLoss(t, mask).item()
+            tot_rand += RandLoss(t, mask)
             cnt1 = 0
+            """
             for i in mask_pred:
                 i.to("cpu")
                 torchvision.utils.save_image(i, "mask_pred/" + args.pre + "/" + str(countt) + "_" + str(cnt1) + ".jpg")
                 cnt1 += 1
+            """
             countt += 1
     print("Dice Accuracy:", tot_val/countt)
     print("Rand Loss:", tot_rand/countt)
